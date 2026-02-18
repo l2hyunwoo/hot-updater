@@ -8,7 +8,6 @@ import com.facebook.react.ReactInstanceEventListener
 import com.facebook.react.bridge.JSBundleLoader
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContext
-import com.facebook.react.common.LifecycleState
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.lang.reflect.Field
 import kotlin.coroutines.resume
@@ -54,13 +53,17 @@ class ReactIntegrationManager(
      */
     private suspend fun reloadInternal(reactHost: ReactHost) {
         try {
-            // Ensure initialized; if not, start and wait
-            waitForReactContextInitialized(reactHost)
+            val currentContext = reactHost.currentReactContext
+            val activity = currentContext?.currentActivity
 
-            val activity = reactHost.currentReactContext?.currentActivity
-            if (reactHost.lifecycleState != LifecycleState.RESUMED && activity != null) {
-                reactHost.onHostResume(activity)
+            if (activity != null && !activity.isFinishing && !activity.isDestroyed) {
+                activity.runOnUiThread {
+                    activity.recreate()
+                }
+                return
             }
+
+            // Fallback: no activity available, use reactHost.reload()
             reactHost.reload("Requested by HotUpdater")
         } catch (e: Exception) {
             Log.d("HotUpdater", "Failed to reload with ReactHost: ${e.message}")
@@ -154,17 +157,17 @@ class ReactIntegrationManager(
 
             // 4. Fallback to old architecture (reactNativeHost)
             @Suppress("DEPRECATION")
-            val reactNativeHost = application.reactNativeHost
-            try {
-                reactNativeHost.reactInstanceManager.recreateReactContextInBackground()
-            } catch (e: Exception) {
-                val currentActivity = reactNativeHost.reactInstanceManager.currentReactContext?.currentActivity
-                if (currentActivity == null) {
-                    return
-                }
-
+            val instanceManager = application.reactNativeHost.reactInstanceManager
+            val currentActivity = instanceManager.currentReactContext?.currentActivity
+            if (currentActivity != null && !currentActivity.isFinishing && !currentActivity.isDestroyed) {
                 currentActivity.runOnUiThread {
                     currentActivity.recreate()
+                }
+            } else {
+                try {
+                    instanceManager.recreateReactContextInBackground()
+                } catch (e: Exception) {
+                    Log.d("HotUpdater", "Failed to reload with old arch: ${e.message}")
                 }
             }
         } catch (e: Exception) {

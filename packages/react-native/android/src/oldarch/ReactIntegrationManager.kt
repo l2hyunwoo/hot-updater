@@ -74,22 +74,23 @@ class ReactIntegrationManager(
             // Ensure initialized; if not, start and wait
             waitForReactContextInitialized(instanceManager)
 
-            instanceManager.recreateReactContextInBackground()
-        } catch (e: Exception) {
-            try {
-                val application = getReactApplication() ?: return
-                val instanceManager = application.reactNativeHost.reactInstanceManager
-                val currentActivity = instanceManager.currentReactContext?.currentActivity
-                if (currentActivity == null) {
-                    return
-                }
-
+            // Use Activity.recreate() to restart without destroying the React instance
+            val currentActivity = instanceManager.currentReactContext?.currentActivity
+            if (currentActivity != null && !currentActivity.isFinishing && !currentActivity.isDestroyed) {
                 currentActivity.runOnUiThread {
                     currentActivity.recreate()
                 }
-            } catch (e2: Exception) {
-                Log.d("HotUpdater", "Failed to reload: ${e2.message}")
+                return
             }
+
+            // Fallback: no activity available, try recreateReactContextInBackground
+            try {
+                instanceManager.recreateReactContextInBackground()
+            } catch (e: Exception) {
+                Log.d("HotUpdater", "Failed to recreateReactContextInBackground: ${e.message}")
+            }
+        } catch (e: Exception) {
+            Log.d("HotUpdater", "Failed to reload: ${e.message}")
         }
     }
 
