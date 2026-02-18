@@ -1,5 +1,14 @@
 # @hot-updater/expo
 
+## 0.25.10
+
+### Patch Changes
+
+- Updated dependencies [90f9610]
+  - @hot-updater/cli-tools@0.25.10
+  - @hot-updater/bare@0.25.10
+  - @hot-updater/plugin-core@0.25.10
+
 ## 0.25.9
 
 ### Patch Changes
